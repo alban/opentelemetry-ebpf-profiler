@@ -282,6 +282,14 @@ func (t *Tracer) Close() {
 	t.processManager.Close()
 }
 
+func (t *Tracer) GetProbeEntryEbpfProgram() *cebpf.Program {
+	return t.ebpfProgs[genericProgName]
+}
+
+func (t *Tracer) GetGenericParamsEbpfMap() *cebpf.Map {
+	return t.ebpfMaps["generic_params"]
+}
+
 // initializeMapsAndPrograms loads the definitions for the eBPF maps and programs provided
 // by the embedded elf file and loads these into the kernel.
 func initializeMapsAndPrograms(kmod *kallsyms.Module, cfg *Config) (
