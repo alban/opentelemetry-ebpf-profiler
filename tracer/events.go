@@ -142,8 +142,11 @@ func (t *Tracer) startTraceEventMonitor(ctx context.Context,
 	traceOutChan chan<- *libpf.EbpfTrace,
 ) func() []metrics.Metric {
 	eventsMap := t.ebpfMaps["trace_events"]
-	eventReader, err := perf.NewReader(eventsMap,
-		t.samplesPerSecond*support.Sizeof_Trace)
+	size := os.Getpagesize()
+	if t.samplesPerSecond != 0 {
+		size = t.samplesPerSecond * support.Sizeof_Trace
+	}
+	eventReader, err := perf.NewReader(eventsMap, size)
 	if err != nil {
 		log.Fatalf("Failed to setup perf reporting via %s: %v", eventsMap, err)
 	}
