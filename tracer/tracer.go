@@ -252,6 +252,14 @@ func (t *Tracer) Close() {
 	t.processManager.Close()
 }
 
+func (t *Tracer) GetProbeEntryEbpfProgram() *cebpf.Program {
+	return t.ebpfProgs["uprobe__generic"]
+}
+
+func (t *Tracer) GetGenericParamsEbpfMap() *cebpf.Map {
+	return t.ebpfMaps["generic_params"]
+}
+
 func buildStackDeltaTemplates(coll *cebpf.CollectionSpec) error {
 	// Prepare the inner map template of the stack deltas map-of-maps.
 	// This cannot be provided from the eBPF C code, and needs to be done here.
