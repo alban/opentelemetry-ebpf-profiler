@@ -136,8 +136,11 @@ func startPerfEventMonitor(ctx context.Context, perfEventMap *ebpf.Map,
 func (t *Tracer) startTraceEventMonitor(ctx context.Context,
 	traceOutChan chan<- *host.Trace) func() []metrics.Metric {
 	eventsMap := t.ebpfMaps["trace_events"]
-	eventReader, err := perf.NewReader(eventsMap,
-		t.samplesPerSecond*support.Sizeof_Trace)
+	size := os.Getpagesize()
+	if t.samplesPerSecond != 0 {
+		size = t.samplesPerSecond * support.Sizeof_Trace
+	}
+	eventReader, err := perf.NewReader(eventsMap, size)
 	if err != nil {
 		log.Fatalf("Failed to setup perf reporting via %s: %v", eventsMap, err)
 	}
@@ -213,6 +216,9 @@ func (t *Tracer) startTraceEventMonitor(ctx context.Context,
 
 				// Keep track of min KTime seen in this batch processing loop
 				trace := t.loadBpfTrace(data.RawSample, data.CPU)
+				if trace == nil {
+					continue
+				}
 				if minKTime == 0 || trace.KTime < minKTime {
 					minKTime = trace.KTime
 				}
