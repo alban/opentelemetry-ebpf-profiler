@@ -98,9 +98,10 @@ func (frames *Frames) Append(frame *Frame) {
 
 // Trace represents a stack trace.
 type Trace struct {
-	Frames       Frames
-	Hash         TraceHash
-	CustomLabels map[String]String
+	Frames        Frames
+	Hash          TraceHash
+	CustomLabels  map[String]String
+	CorrelationID uint64
 }
 
 // EbpfTrace represents a stack trace from Ebpf code.
@@ -121,6 +122,7 @@ type EbpfTrace struct {
 	EnvVars          map[String]String
 	CustomLabels     map[String]String
 	KernelFrames     Frames
+	CorrelationID    uint64
 	FrameData        []uint64
 	FrameDataBuf     [3072]uint64
 }
