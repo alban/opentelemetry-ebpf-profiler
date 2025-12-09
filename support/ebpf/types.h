@@ -640,6 +640,9 @@ typedef struct Trace {
   // The CPU that captured this trace.
   u32 cpu_id;
 
+  // ID used to correlate custom uprobe__generic invocations
+  u64 correlation_id;
+
   // The frame data of the stack trace. Each frame is variable length.
   // Frame is currently 2-3 entries long. This array size limits the
   // number of frames we can unwind, but also increases the memory

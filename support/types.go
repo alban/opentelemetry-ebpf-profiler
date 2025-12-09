@@ -168,6 +168,7 @@ type Trace struct {
 	Origin             uint32
 	Value              uint64
 	Cpu_id             uint32
+	Correlation_id     uint64
 	Frame_data         [3072]uint64
 }
 type UnwindInfo struct {

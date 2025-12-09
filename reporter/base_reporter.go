@@ -66,6 +66,7 @@ func (b *baseReporter) ReportTraceEvent(trace *libpf.Trace, meta *samples.TraceE
 		ContainerID:    meta.ContainerID,
 		PID:            int64(meta.PID),
 		ExecutablePath: meta.ExecutablePath,
+		CorrelationID:  meta.CorrelationID,
 	}
 
 	eventsTree := b.traceEvents.WLock()
@@ -99,10 +100,11 @@ func (b *baseReporter) ReportTraceEvent(trace *libpf.Trace, meta *samples.TraceE
 	}
 
 	rtp.Events[meta.Origin][sampleKey] = &samples.TraceEvents{
-		Frames:     trace.Frames,
-		Timestamps: []uint64{uint64(meta.Timestamp)},
-		Values:     []int64{meta.Value},
-		Labels:     trace.CustomLabels,
+		Frames:        trace.Frames,
+		Timestamps:    []uint64{uint64(meta.Timestamp)},
+		Values:        []int64{meta.Value},
+		Labels:        trace.CustomLabels,
+		CorrelationID: trace.CorrelationID,
 	}
 	return nil
 }

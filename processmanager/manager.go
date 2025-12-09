@@ -328,13 +328,15 @@ func (pm *ProcessManager) HandleTrace(bpfTrace *libpf.EbpfTrace) {
 		EnvVars:        bpfTrace.EnvVars,
 		TraceID:        bpfTrace.APMTraceID,
 		SpanID:         bpfTrace.APMTransactionID,
+		CorrelationID:  bpfTrace.CorrelationID,
 	}
 
 	pid := bpfTrace.PID
 	kernelFramesLen := len(bpfTrace.KernelFrames)
 	trace := &libpf.Trace{
-		Frames:       make(libpf.Frames, kernelFramesLen, kernelFramesLen+bpfTrace.NumFrames),
-		CustomLabels: bpfTrace.CustomLabels,
+		Frames:        make(libpf.Frames, kernelFramesLen, kernelFramesLen+bpfTrace.NumFrames),
+		CustomLabels:  bpfTrace.CustomLabels,
+		CorrelationID: bpfTrace.CorrelationID,
 	}
 	copy(trace.Frames, bpfTrace.KernelFrames)
 

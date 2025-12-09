@@ -21,14 +21,16 @@ type TraceEventMeta struct {
 	PID, TID       libpf.PID
 	SpanID         libpf.APMSpanID
 	TraceID        libpf.APMTraceID
+	CorrelationID  uint64
 }
 
 // TraceEvents holds known information about a trace.
 type TraceEvents struct {
-	Labels     map[libpf.String]libpf.String
-	Frames     libpf.Frames
-	Timestamps []uint64 // in nanoseconds
-	Values     []int64
+	Labels        map[libpf.String]libpf.String
+	Frames        libpf.Frames
+	Timestamps    []uint64 // in nanoseconds
+	Values        []int64
+	CorrelationID uint64
 }
 
 // TraceEventsTree stores samples and their related metadata in a tree-like

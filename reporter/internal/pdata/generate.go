@@ -278,6 +278,14 @@ func (p *Pdata) setProfile(
 				value.String())
 		}
 
+		if traceInfo.CorrelationID > 0 {
+			attrMgr.AppendInt(
+				sample.AttributeIndices(),
+				"correlation_id",
+				int64(traceInfo.CorrelationID),
+			)
+		}
+
 		attrMgr.AppendOptionalString(sample.AttributeIndices(),
 			semconv.ThreadNameKey, sampleKey.Comm.String())
 		attrMgr.AppendInt(sample.AttributeIndices(),

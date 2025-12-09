@@ -1052,6 +1052,7 @@ func (t *Tracer) loadBpfTrace(raw []byte) (*libpf.EbpfTrace, error) {
 		KTime:            int64(ptr.Ktime),
 		CpuID:            int(ptr.Cpu_id),
 		EnvVars:          procMeta.EnvVariables,
+		CorrelationID:    ptr.Correlation_id,
 	}
 
 	switch trace.Origin {
