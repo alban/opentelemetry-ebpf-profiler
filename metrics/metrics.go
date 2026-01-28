@@ -140,7 +140,7 @@ func AddSlice(newMetrics []Metric) {
 		}
 
 		if _, ok := metricTypes[metric.ID]; !ok {
-			log.Warnf("Invalid metric id %d, skipping", metric.ID)
+			//log.Warnf("Invalid metric id %d, skipping", metric.ID)
 			continue
 		}
 
