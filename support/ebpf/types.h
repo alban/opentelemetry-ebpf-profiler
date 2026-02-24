@@ -776,6 +776,12 @@ typedef struct CustomLabelsState {
   void *go_m_ptr;
 } CustomLabelsState;
 
+typedef struct TraceCache {
+  u32 pid;
+  u32 tid;
+  u64 frame_data[3072];
+} TraceCache;
+
 // Per-CPU info for the stack being built. This contains the stack as well as
 // meta-data on the number of eBPF tail-calls used so far to construct it.
 typedef struct PerCPURecord {

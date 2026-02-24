@@ -116,6 +116,42 @@ struct trace_events_t {
   __uint(max_entries, 0);
 } trace_events SEC(".maps");
 
+// Correlation ID
+
+typedef struct GenericParam {
+  u64 correlation_id;
+} GenericParam;
+
+struct generic_params_t {
+  __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+  __type(key, int);
+  __type(value, GenericParam);
+  __uint(max_entries, 1);
+} generic_params SEC(".maps");
+
+// Trace cache
+
+struct trace_cache_tmp_t {
+  __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+  __type(key, int);
+  __type(value, TraceCache);
+  __uint(max_entries, 1);
+} trace_cache_tmp SEC(".maps");
+
+struct trace_cache_zero_t {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, TraceCache);
+  __uint(max_entries, 1);
+} trace_cache_zero SEC(".maps");
+
+struct stack_cache2correlation_id_t {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __type(key, TraceCache);
+  __type(value, u64);
+  __uint(max_entries, 1024);
+} stack_cache2correlation_id SEC(".maps");
+
 // End shared maps
 
 struct apm_int_procs_t {
@@ -240,6 +276,7 @@ static EBPF_INLINE void maybe_add_apm_info(Trace *trace)
 // unwind_stop is the tail call destination for PROG_UNWIND_STOP.
 static EBPF_INLINE int unwind_stop(struct pt_regs *ctx)
 {
+  DEBUG_PRINT("Entered unwind_stop");
   PerCPURecord *record = get_per_cpu_record();
   if (!record)
     return -1;
@@ -296,6 +333,51 @@ static EBPF_INLINE int unwind_stop(struct pt_regs *ctx)
 
   // Must be last since it may not return (it will call send_trace).
   maybe_add_go_custom_labels(ctx, record);
+
+  // Build traceCache
+  DEBUG_PRINT("Building trace cache");
+  int key0 = 0;
+  TraceCache *traceCache = bpf_map_lookup_elem(&trace_cache_tmp, &key0);
+  if (!traceCache) {
+    DEBUG_PRINT("Failed to lookup trace cache");
+    return 0;
+  }
+  TraceCache *traceCacheZero = bpf_map_lookup_elem(&trace_cache_zero, &key0);
+  if (!traceCacheZero) {
+    DEBUG_PRINT("Failed to lookup trace cache zero");
+    return 0;
+  }
+
+  bpf_probe_read_kernel(traceCache, sizeof(TraceCache), 
+                       traceCacheZero);
+
+  traceCache->pid = trace->pid;
+  traceCache->tid = trace->tid;
+
+  u16 len = trace->frame_data_len;
+  if (len > 3072) {
+    len = 3072;
+  }
+  
+  if (len > 0) {
+    bpf_probe_read_kernel(traceCache->frame_data, len * sizeof(u64), trace->frame_data);
+  }
+
+  // Check if traceCache already exists
+  u64 *correlation_id_ptr = bpf_map_lookup_elem(&stack_cache2correlation_id, traceCache);
+  if (correlation_id_ptr) {
+    DEBUG_PRINT("stack already exists in cache with correlation ID %llu, reusing it", *correlation_id_ptr);
+    bpf_map_update_elem(&generic_params, &key0, correlation_id_ptr, BPF_ANY);
+    return 0;
+  }
+
+  u64 correlation_id = bpf_ktime_get_ns();
+  DEBUG_PRINT("stack not in cache. Assigning new correlation ID %llu", correlation_id);
+
+  // Add traceCache in the cache
+  bpf_map_update_elem(&stack_cache2correlation_id, traceCache, &correlation_id, BPF_ANY);
+  bpf_map_update_elem(&generic_params, &key0, &correlation_id, BPF_ANY);
+  trace->correlation_id = correlation_id;
 
   send_trace(ctx, trace);
 
