@@ -146,10 +146,10 @@ struct trace_cache_zero_t {
 } trace_cache_zero SEC(".maps");
 
 struct stack_cache2correlation_id_t {
-  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(type, BPF_MAP_TYPE_LRU_HASH);
   __type(key, TraceCache);
   __type(value, u64);
-  __uint(max_entries, 1024);
+  __uint(max_entries, 256);
 } stack_cache2correlation_id SEC(".maps");
 
 // End shared maps

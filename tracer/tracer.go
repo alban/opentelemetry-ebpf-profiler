@@ -291,6 +291,14 @@ func (t *Tracer) GetGenericParamsEbpfMap() *cebpf.Map {
 	return t.ebpfMaps["generic_params"]
 }
 
+// GetStackCacheMap returns the eBPF LRU hash map that caches
+// stack traces to correlation IDs. Library consumers can iterate
+// its values to discover which correlation IDs are still active
+// in the BPF side, enabling userspace cache cleanup.
+func (t *Tracer) GetStackCacheMap() *cebpf.Map {
+	return t.ebpfMaps["stack_cache2correlation_id"]
+}
+
 // initializeMapsAndPrograms loads the definitions for the eBPF maps and programs provided
 // by the embedded elf file and loads these into the kernel.
 func initializeMapsAndPrograms(kmod *kallsyms.Module, cfg *Config) (
