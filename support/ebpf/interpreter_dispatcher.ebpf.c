@@ -124,7 +124,7 @@ typedef struct GenericParam {
 
 struct generic_params_t {
   __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-  __type(key, int);
+  __type(key, u32);
   __type(value, GenericParam);
   __uint(max_entries, 1);
 } generic_params SEC(".maps");
