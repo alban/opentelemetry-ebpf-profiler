@@ -67,6 +67,8 @@ type ResourceKey struct {
 	APMServiceName string
 
 	PID int64
+
+	CorrelationID uint64
 }
 
 // SampleKey holds a unique trace hash and its dedicated meta data.
