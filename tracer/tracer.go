@@ -644,6 +644,8 @@ func loadAllMaps(coll *cebpf.CollectionSpec, cfg *Config,
 	// TODO: Base this on present CPUs instead, as runtime.NumCPU is fixed for the lifetime
 	// of the process?
 	ringbufSize := uint64(cfg.SamplesPerSecond * runtime.NumCPU() * support.Sizeof_Trace)
+	// Ring buffer size must be at least one page.
+	ringbufSize = max(ringbufSize, uint64(os.Getpagesize()))
 	adaption["trace_events"] = uint32(min(util.NextPowerOfTwo(ringbufSize), 1<<31))
 
 	for i := support.StackDeltaBucketSmallest; i <= support.StackDeltaBucketLargest; i++ {
