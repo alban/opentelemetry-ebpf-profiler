@@ -158,7 +158,10 @@ func AddSlice(newMetrics []Metric) {
 		}
 
 		if _, ok := metricTypes[metric.ID]; !ok {
-			log.Warnf("Invalid metric id %d, skipping", metric.ID)
+			// Downgraded from Warnf: library consumers that only load a
+			// subset of tracers/eBPF programs may legitimately report
+			// metric IDs that aren't registered here.
+			log.Debugf("Invalid metric id %d, skipping", metric.ID)
 			continue
 		}
 
