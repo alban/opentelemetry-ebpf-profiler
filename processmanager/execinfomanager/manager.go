@@ -14,7 +14,6 @@ import (
 
 	"go.opentelemetry.io/ebpf-profiler/host"
 	"go.opentelemetry.io/ebpf-profiler/interpreter"
-	"go.opentelemetry.io/ebpf-profiler/interpreter/apmint"
 	"go.opentelemetry.io/ebpf-profiler/interpreter/beam"
 	"go.opentelemetry.io/ebpf-profiler/interpreter/dotnet"
 	golang "go.opentelemetry.io/ebpf-profiler/interpreter/go"
@@ -132,7 +131,7 @@ func NewExecutableInfoManager(
 		loaders = append(loaders, luajit.GetLoader(interpretersConfig.LuaJIT))
 	}
 
-	loaders = append(loaders, apmint.Loader)
+	// Inspektor Gadget fork: keep APM integration disabled.
 
 	deferredFileIDs, err := lru.NewSynced[host.FileID, libpf.Void](deferredFileIDSize,
 		func(id host.FileID) uint32 { return uint32(id) })
