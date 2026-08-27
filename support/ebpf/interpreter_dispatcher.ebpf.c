@@ -129,6 +129,64 @@ struct trace_events_t {
   __uint(max_entries, 0);
 } trace_events SEC(".maps");
 
+// Correlation ID
+//
+// generic_params is used to pass a correlation_id from unwind_stop() to the
+// next invocation of generic_uprobe (a third party eBPF program, e.g.
+// Inspektor Gadget, tail calling into the profiler's kprobe/uprobe entry
+// point obtained via RegisterCollectTrampoline()), so that the resulting
+// Trace can be correlated with whatever the third party probe captured
+// (e.g. a network request).
+
+typedef struct GenericParam {
+  u64 correlation_id;
+} GenericParam;
+
+struct generic_params_t {
+  __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+  __type(key, u32);
+  __type(value, GenericParam);
+  __uint(max_entries, 1);
+} generic_params SEC(".maps");
+
+// Trace cache
+//
+// Identical stacks (same pid/tid/frame_data) are deduplicated: unwind_stop()
+// looks up the stack in stack_cache2correlation_id and, on a hit, reuses the
+// existing correlation ID without resending the (already known) trace to
+// userspace; on a miss, a new correlation ID is assigned, the stack is
+// cached, and the trace is sent as usual.
+
+struct trace_cache_tmp_t {
+  __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+  __type(key, int);
+  __type(value, TraceCache);
+  __uint(max_entries, 1);
+} trace_cache_tmp SEC(".maps");
+
+struct trace_cache_zero_t {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, TraceCache);
+  __uint(max_entries, 1);
+} trace_cache_zero SEC(".maps");
+
+// stack_cache2correlation_id uses BPF_MAP_TYPE_LRU_HASH so the kernel
+// automatically evicts least-recently-used entries when the map is full,
+// bounding memory usage (~6 MiB for the 24 KiB TraceCache keys at 256
+// entries). When an entry is evicted, the next occurrence of that stack is
+// treated as a cache miss: a new correlation ID is assigned and the trace is
+// resent, so the stack is re-symbolized. GetStackCacheMap() exposes this map
+// so library consumers can iterate its values to discover which correlation
+// IDs are still active, enabling synchronized cleanup of their userspace
+// correlation caches.
+struct stack_cache2correlation_id_t {
+  __uint(type, BPF_MAP_TYPE_LRU_HASH);
+  __type(key, TraceCache);
+  __type(value, u64);
+  __uint(max_entries, 256);
+} stack_cache2correlation_id SEC(".maps");
+
 // End shared maps
 
 // Implements the specification to share span/trace IDs according to:
@@ -316,6 +374,50 @@ static EBPF_INLINE int unwind_stop(struct pt_regs *ctx)
 
   // Must be last since it may not return (it will call send_trace).
   maybe_add_go_custom_labels(ctx, record);
+
+  // Deduplicate identical stacks (same pid/tid/frame_data) via
+  // stack_cache2correlation_id: reuse an existing correlation ID on a cache
+  // hit (and skip resending the trace, since userspace already has it), or
+  // assign a new one on a miss and proceed to send_trace as usual.
+  int key0               = 0;
+  TraceCache *traceCache = bpf_map_lookup_elem(&trace_cache_tmp, &key0);
+  if (!traceCache) {
+    DEBUG_PRINT("Failed to lookup trace cache scratch space");
+    return 0;
+  }
+  TraceCache *traceCacheZero = bpf_map_lookup_elem(&trace_cache_zero, &key0);
+  if (!traceCacheZero) {
+    DEBUG_PRINT("Failed to lookup trace cache zero value");
+    return 0;
+  }
+  bpf_probe_read_kernel(traceCache, sizeof(TraceCache), traceCacheZero);
+
+  traceCache->pid = trace->pid;
+  traceCache->tid = trace->tid;
+
+  u16 len = trace->frame_data_len;
+  const u32 max_frames = sizeof(traceCache->frame_data) / sizeof(traceCache->frame_data[0]);
+  if (len > max_frames) {
+    len = max_frames;
+  }
+  if (len > 0) {
+    bpf_probe_read_kernel(traceCache->frame_data, len * sizeof(u64), trace->frame_data);
+  }
+
+  u64 *correlation_id_ptr = bpf_map_lookup_elem(&stack_cache2correlation_id, traceCache);
+  if (correlation_id_ptr) {
+    DEBUG_PRINT("stack already in cache with correlation ID %llu, reusing it", *correlation_id_ptr);
+    GenericParam param = {.correlation_id = *correlation_id_ptr};
+    bpf_map_update_elem(&generic_params, &key0, &param, BPF_ANY);
+    return 0;
+  }
+
+  u64 correlation_id = bpf_ktime_get_ns();
+  DEBUG_PRINT("stack not in cache, assigning new correlation ID %llu", correlation_id);
+  bpf_map_update_elem(&stack_cache2correlation_id, traceCache, &correlation_id, BPF_ANY);
+  GenericParam param = {.correlation_id = correlation_id};
+  bpf_map_update_elem(&generic_params, &key0, &param, BPF_ANY);
+  trace->value = correlation_id;
 
   send_trace(ctx, trace);
 

@@ -686,6 +686,19 @@ typedef struct Trace {
   // 'frame_data_len' elements of 'frame_data' are sent.
 } Trace;
 
+// TraceCache is used as the key of the stack_cache2correlation_id map to
+// deduplicate identical stacks (same pid/tid/frame_data) seen by
+// unwind_stop(), so that a correlation ID can be reused across repeated
+// occurrences of the same stack instead of resending the same trace to
+// userspace every time. Unlike frame_data in Trace, this array is always
+// fully sized (not variable length) since it is used as a fixed-size map
+// key.
+typedef struct TraceCache {
+  u32 pid;
+  u32 tid;
+  u64 frame_data[3072];
+} TraceCache;
+
 // Container for unwinding state
 typedef struct UnwindState {
   // CPU register state
