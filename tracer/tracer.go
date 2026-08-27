@@ -76,6 +76,12 @@ const (
 	obiSpanTracesMap = "traces_ctx_v1"
 )
 
+// minTraceEventsSamplesPerSecond is the assumed samples-per-second rate used
+// to size the trace_events ring buffer when Config.SamplesPerSecond is 0
+// (e.g. a library consumer that only uses kprobe/uprobe-based tracing,
+// without CPU sampling).
+const minTraceEventsSamplesPerSecond = 20
+
 // Intervals is a subset of config.IntervalsAndTimers.
 type Intervals interface {
 	MonitorInterval() time.Duration
@@ -701,7 +707,15 @@ func loadAllMaps(coll *cebpf.CollectionSpec, cfg *Config,
 	// Allow for 1s of 'burst' trace data (sizing by Trace length worst-case)
 	// TODO: Base this on present CPUs instead, as runtime.NumCPU is fixed for the lifetime
 	// of the process?
-	ringbufSize := uint64(cfg.SamplesPerSecond * runtime.NumCPU() * support.Sizeof_Trace)
+	// When SamplesPerSecond is 0 (e.g. a library consumer only uses
+	// kprobe/uprobe-based tracing without CPU sampling), fall back to a
+	// reasonable minimum so the trace_events ring buffer isn't sized down to
+	// (almost) nothing.
+	effectiveSamplesPerSecond := cfg.SamplesPerSecond
+	if effectiveSamplesPerSecond == 0 {
+		effectiveSamplesPerSecond = minTraceEventsSamplesPerSecond
+	}
+	ringbufSize := uint64(effectiveSamplesPerSecond * runtime.NumCPU() * support.Sizeof_Trace)
 	adaption["trace_events"] = uint32(min(util.NextPowerOfTwo(ringbufSize), 1<<31))
 
 	for i := support.StackDeltaBucketSmallest; i <= support.StackDeltaBucketLargest; i++ {
