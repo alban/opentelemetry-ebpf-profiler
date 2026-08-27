@@ -367,6 +367,28 @@ func (t *Tracer) Close() {
 	t.signalDone()
 }
 
+const perfEntryProgName = "native_tracer_entry"
+
+// GetPerfEntryEbpfProgram returns the perf_event-typed eBPF program that third
+// party BPF_PROG_TYPE_PERF_EVENT programs can tail call into.
+func (t *Tracer) GetPerfEntryEbpfProgram() *cebpf.Program {
+	return t.ebpfProgs[perfEntryProgName]
+}
+
+// GetGenericParamsEbpfMap returns the eBPF map into which the profiler writes
+// the correlation_id (in unwind_stop) so that a third party eBPF program can
+// read it back after tail calling into the profiler and correlate its own
+// event with the unwound stack.
+func (t *Tracer) GetGenericParamsEbpfMap() *cebpf.Map {
+	return t.ebpfMaps["generic_params"]
+}
+
+// GetStackCacheMap returns the correlation stack cache map used by generic
+// trace correlation.
+func (t *Tracer) GetStackCacheMap() *cebpf.Map {
+	return t.ebpfMaps["stack_cache2correlation_id"]
+}
+
 // initializeMapsAndPrograms loads the definitions for the eBPF maps and programs provided
 // by the embedded elf file and loads these into the kernel.
 func initializeMapsAndPrograms(kmod *kallsyms.Module, cfg *Config, origins *originRegistry,
@@ -1237,7 +1259,7 @@ func terminatePerfEvents(events []*perf.Event) {
 // entry point is always the native tracer. The native tracer will determine when to invoke the
 // interpreter tracers based on address range information.
 func (t *Tracer) AttachTracer(targetCPUs []int) error {
-	tracerProg, ok := t.ebpfProgs["native_tracer_entry"]
+	tracerProg, ok := t.ebpfProgs[perfEntryProgName]
 	if !ok {
 		return errors.New("entry program is not available")
 	}
