@@ -696,6 +696,14 @@ typedef struct Trace {
 // alignment of the struct and the field matches. See tracer/tracer.go.
 _Static_assert(_Alignof(Trace) == _Alignof(TraceData), "Trace alignment mismatch");
 
+// TraceCache is the key of stack_cache2correlation_id (Inspektor Gadget fork):
+// a stack's pid, tid and frames, zero padded to a fixed size.
+typedef struct TraceCache {
+  u32 pid;
+  u32 tid;
+  u8 frame_data[MAX_FRAME_DATA_SZ];
+} TraceCache;
+
 // Container for unwinding state
 typedef struct UnwindState {
   // CPU register state

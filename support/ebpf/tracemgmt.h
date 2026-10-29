@@ -773,7 +773,7 @@ static inline EBPF_INLINE void push_kernel_frames(void *ctx, Trace *trace)
 }
 
 // Send a trace to userspace via the `trace_events` ringbuffer.
-static inline EBPF_INLINE void send_trace(UNUSED void *ctx, Trace *trace)
+static inline EBPF_INLINE bool send_trace(UNUSED void *ctx, Trace *trace)
 {
   u64 send_size = __builtin_offsetof(struct Trace, variable_data) + trace->variable_data_end;
 
@@ -789,7 +789,9 @@ static inline EBPF_INLINE void send_trace(UNUSED void *ctx, Trace *trace)
   // capture an error here and increment the associated metric.
   if (bpf_ringbuf_output(&trace_events, trace, send_size, BPF_RB_NO_WAKEUP) < 0) {
     increment_metric(metricID_BPFRingbufOutputErr);
+    return false;
   }
+  return true;
 }
 
 // is_kernel_address checks if the given address looks like virtual address to kernel memory.

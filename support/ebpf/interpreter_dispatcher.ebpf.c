@@ -129,6 +129,51 @@ struct trace_events_t {
   __uint(max_entries, 0);
 } trace_events SEC(".maps");
 
+// Inspektor Gadget fork: stack deduplication.
+//
+// IG gadgets tail call into the external probe entry points without setting
+// ext_probe_value, so the trace's context value is 0 and dedup_trace()
+// generates its correlation id. unwind_stop() deduplicates identical stacks (same
+// pid/tid/frames): on a miss, the trace is sent and, once the ring buffer
+// accepted it, the stack is cached with that id; on a hit, the trace is not
+// sent again and the cached id is used instead. Either way the id is written
+// to generic_params, which the gadget reads after the tail call returns.
+
+typedef struct GenericParam {
+  u64 correlation_id;
+} GenericParam;
+
+struct generic_params_t {
+  __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+  __type(key, u32);
+  __type(value, GenericParam);
+  __uint(max_entries, 1);
+} generic_params SEC(".maps");
+
+struct trace_cache_tmp_t {
+  __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+  __type(key, int);
+  __type(value, TraceCache);
+  __uint(max_entries, 1);
+} trace_cache_tmp SEC(".maps");
+
+struct trace_cache_zero_t {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, TraceCache);
+  __uint(max_entries, 1);
+} trace_cache_zero SEC(".maps");
+
+// stack_cache2correlation_id is an LRU (~6 MiB for 256 keys of 24 KiB): an
+// evicted stack is sent again with a new id on its next occurrence. IG
+// iterates it to know which ids are still in use (Tracer.GetStackCacheMap).
+struct stack_cache2correlation_id_t {
+  __uint(type, BPF_MAP_TYPE_LRU_HASH);
+  __type(key, TraceCache);
+  __type(value, u64);
+  __uint(max_entries, 256);
+} stack_cache2correlation_id SEC(".maps");
+
 // End shared maps
 
 // Implements the specification to share span/trace IDs according to:
@@ -383,6 +428,60 @@ static EBPF_INLINE void maybe_add_golang_labels(PerCPURecord *record)
   record->trace.golang_label_end = end_variable_data(&record->trace, sizeof(GolangLabel));
 }
 
+// dedup_trace looks up trace's stack in stack_cache2correlation_id (see
+// above) and writes its correlation id to generic_params. It sets *send to
+// false when the stack was already sent. On a miss, it returns the key that
+// the caller must cache once the trace is actually sent: caching a trace
+// that is then lost would hand an id without frames to every later hit.
+// Traces without a single context value (the id) are left alone: in IG
+// every trace comes from an external probe.
+static EBPF_INLINE TraceCache *dedup_trace(Trace *trace, bool *send)
+{
+  *send = true;
+  if (trace->context_value_end != sizeof(u64)) {
+    return NULL;
+  }
+  int key0         = 0;
+  TraceCache *key  = bpf_map_lookup_elem(&trace_cache_tmp, &key0);
+  TraceCache *zero = bpf_map_lookup_elem(&trace_cache_zero, &key0);
+  if (!key || !zero) {
+    return NULL;
+  }
+  bpf_probe_read_kernel(key, sizeof(*key), zero);
+  key->pid = trace->pid;
+  key->tid = trace->tid;
+
+  // The frames (kernel, then user) follow the context value.
+  u32 len = 0;
+  if (trace->frame_data_end > sizeof(u64)) {
+    len = trace->frame_data_end - sizeof(u64);
+  }
+  if (len > sizeof(key->frame_data)) {
+    len = sizeof(key->frame_data);
+  }
+  bpf_probe_read_kernel(key->frame_data, len, &trace->variable_data[sizeof(u64)]);
+
+  u64 *ctx_id = (u64 *)trace->variable_data;
+  if (*ctx_id == 0) {
+    // Random: unique across CPUs without a shared counter. Never 0, which
+    // means "no stack" to IG.
+    *ctx_id = ((u64)bpf_get_prandom_u32() << 32) | bpf_get_prandom_u32();
+    if (*ctx_id == 0) {
+      *ctx_id = 1;
+    }
+  }
+  u64 id    = *ctx_id;
+  u64 *seen = bpf_map_lookup_elem(&stack_cache2correlation_id, key);
+  if (seen) {
+    id    = *seen;
+    *send = false;
+    key   = NULL;
+  }
+  GenericParam param = {.correlation_id = id};
+  bpf_map_update_elem(&generic_params, &key0, &param, BPF_ANY);
+  return key;
+}
+
 // unwind_stop is the tail call destination for PROG_UNWIND_STOP.
 static EBPF_INLINE int unwind_stop(struct pt_regs *ctx)
 {
@@ -444,9 +543,18 @@ static EBPF_INLINE int unwind_stop(struct pt_regs *ctx)
 
   trace->frame_data_end = end_variable_data(trace, sizeof(u64));
 
+  bool send             = true;
+  TraceCache *cache_key = dedup_trace(trace, &send);
+  if (!send) {
+    return 0;
+  }
+
   maybe_add_thread_context_info(trace);
   maybe_add_golang_labels(record);
-  send_trace(ctx, trace);
+  if (send_trace(ctx, trace) && cache_key) {
+    u64 id = *(u64 *)trace->variable_data;
+    bpf_map_update_elem(&stack_cache2correlation_id, cache_key, &id, BPF_ANY);
+  }
 
   return 0;
 }

@@ -232,6 +232,19 @@ func (t *Tracer) Done() <-chan libpf.Void {
 	return t.done
 }
 
+// GetGenericParamsEbpfMap returns the per-CPU map into which unwind_stop
+// writes the correlation id of the stack it unwound, for an external probe to
+// read after its tail call returns (Inspektor Gadget fork).
+func (t *Tracer) GetGenericParamsEbpfMap() *cebpf.Map {
+	return t.ebpfMaps["generic_params"]
+}
+
+// GetStackCacheMap returns the LRU map of the stacks sent and their
+// correlation ids, to know which ids are still in use (Inspektor Gadget fork).
+func (t *Tracer) GetStackCacheMap() *cebpf.Map {
+	return t.ebpfMaps["stack_cache2correlation_id"]
+}
+
 // signalDone closes the done channel to indicate an unrecoverable error.
 // It is safe to call multiple times.
 func (t *Tracer) signalDone() {
