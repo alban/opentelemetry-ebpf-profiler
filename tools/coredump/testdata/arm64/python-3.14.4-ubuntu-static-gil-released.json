@@ -1,0 +1,62 @@
+{
+  "coredump-ref": "6607cb9c4a2989e9d4d6348ee6d765ec81b17cc2fbb9db462d01528770deb302",
+  "threads": [
+    {
+      "lwp": 20892,
+      "frames": [
+        "libc.so.6+0x88460",
+        "libc.so.6+0xc56fb",
+        "python3.14+0x6d193b",
+        "python3.14+0x4d3f7f",
+        "sleeps_without_gil+1 in /tmp/opentelemetry-ebpf-profiler/tools/coredump/testsources/python/gil_released.py:12",
+        "calls_sleep+1 in /tmp/opentelemetry-ebpf-profiler/tools/coredump/testsources/python/gil_released.py:16",
+        "<module>+18 in /tmp/opentelemetry-ebpf-profiler/tools/coredump/testsources/python/gil_released.py:19",
+        "python3.14+0x4f1057",
+        "python3.14+0x4e81ff",
+        "python3.14+0x6a0da3",
+        "python3.14+0x69c2af",
+        "python3.14+0x69b7f7",
+        "python3.14+0x69b203",
+        "python3.14+0x697e8b",
+        "python3.14+0x6298b3",
+        "libc.so.6+0x22f1b",
+        "libc.so.6+0x2305b",
+        "python3.14+0x62842f"
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "ref": "c4c52c0df6f3809f1b85927a85f322d102cffebb6b517b44b37048f6fd620c01",
+      "local-path": "/usr/lib/aarch64-linux-gnu/gconv/gconv-modules.cache"
+    },
+    {
+      "ref": "d1b87c365d0cf5a985cfedfc227ff613a5bc6ff56e841202eb9330d263bbeee9",
+      "local-path": "/usr/bin/python3.14"
+    },
+    {
+      "ref": "dc0d80629dd3c805aff420244f479eefb5f8a0c096a0eb30763961a080149c8a",
+      "local-path": "/usr/lib/locale/locale-archive"
+    },
+    {
+      "ref": "7b17086ce95b15145e6c2c5f8146395f80e2df1af2636fbf78e90c546a70df06",
+      "local-path": "/usr/lib/aarch64-linux-gnu/libc.so.6"
+    },
+    {
+      "ref": "ab708bf035b6fa96ddc16b9363700f5f2d1834e52ed3db319eb98837417e59e3",
+      "local-path": "/usr/lib/aarch64-linux-gnu/libexpat.so.1.11.2"
+    },
+    {
+      "ref": "2d2437c87551b247720b69dd3d761227b4d6f7ee9a20a10ee75e6efc2808b79a",
+      "local-path": "/usr/lib/aarch64-linux-gnu/libz.so.1.3.1"
+    },
+    {
+      "ref": "ffeae799646fae7a8af80402a88f4bc84bfc110af834f5e756aae2fa0a1a9602",
+      "local-path": "/usr/lib/aarch64-linux-gnu/libm.so.6"
+    },
+    {
+      "ref": "7cdd4ce693d93790bf088dca2e86857f758335b6010d913e086fa384e7704a46",
+      "local-path": "/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"
+    }
+  ]
+}
